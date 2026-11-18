@@ -209,5 +209,62 @@ function submitSig(){
 
 start();
 </script>
+<!-- Signing wait screen: shows while the signature is being saved -->
+<style>
+  #ofmWait{display:none;position:fixed;inset:0;z-index:9999;background:rgba(255,255,255,.96);align-items:center;justify-content:center;padding:24px;text-align:center;font-family:Arial,sans-serif;color:#1f2633}
+  #ofmWait.on{display:flex}
+  #ofmWait .box{max-width:340px}
+  #ofmWait .spin{width:56px;height:56px;margin:0 auto 18px;border:5px solid #dfe3ee;border-top-color:#313F7A;border-radius:50%;animation:ofmSpin 1s linear infinite}
+  #ofmWait h2{margin:0 0 8px;font-size:20px;color:#313F7A}
+  #ofmWait p{margin:0;font-size:15px;line-height:1.45}
+  @keyframes ofmSpin{to{transform:rotate(360deg)}}
+</style>
+<div id="ofmWait" role="status" aria-live="polite">
+  <div class="box">
+    <div class="spin"></div>
+    <h2>Saving your signature</h2>
+    <p id="ofmWaitText"></p>
+  </div>
+</div>
+<script>
+(function () {
+  var FIRST = 'Please keep this page open. This usually takes a few seconds.';
+  var LATER = 'Still saving. Thanks for your patience. Please don\'t close this page.';
+  var box = document.getElementById('ofmWait'), text = document.getElementById('ofmWaitText');
+  var timer = null, active = 0;
+
+  function warn(e) { e.preventDefault(); e.returnValue = ''; }
+  function show() {
+    if (active++) return;
+    text.textContent = FIRST;
+    box.classList.add('on');
+    timer = setTimeout(function () { text.textContent = LATER; }, 12000);
+    window.addEventListener('beforeunload', warn);
+  }
+  function hide() {
+    if (--active > 0) return;
+    active = 0;
+    clearTimeout(timer);
+    box.classList.remove('on');
+    window.removeEventListener('beforeunload', warn);
+  }
+  function isSubmit(body) { return typeof body === 'string' && /"op"\s*:\s*"submit"/.test(body); }
+
+  var realFetch = window.fetch;
+  if (realFetch) window.fetch = function (url, opts) {
+    var p = realFetch.apply(this, arguments);
+    if (!opts || !isSubmit(opts.body)) return p;
+    show();
+    p.then(hide, hide);
+    return p;
+  };
+
+  var realSend = XMLHttpRequest.prototype.send;
+  XMLHttpRequest.prototype.send = function (body) {
+    if (isSubmit(body)) { show(); this.addEventListener('loadend', hide); }
+    return realSend.apply(this, arguments);
+  };
+})();
+</script>
 </body>
 </html>
